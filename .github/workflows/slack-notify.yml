@@ -32,6 +32,9 @@ jobs:
           fi
           TRUNCATED=$(echo "$RAW" | tr '\n' ' ' | tr -s ' ' | cut -d' ' -f1-10 || echo "")
           echo "body=${TRUNCATED:-}" >> $GITHUB_OUTPUT
+          TITLE="${{ github.event.issue.title }}"
+          TRUNCATED_TITLE=$(echo "$TITLE" | tr '\n' ' ' | tr -s ' ' | cut -d' ' -f1-10 || echo "")
+          echo "title=${TRUNCATED_TITLE:-}" >> $GITHUB_OUTPUT
 
       - name: Notify Slack
         uses: slackapi/slack-github-action@v2.0.0
