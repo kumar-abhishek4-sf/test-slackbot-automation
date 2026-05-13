@@ -16,12 +16,16 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
-    if: ${{ !(github.event_name == 'issue_comment' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) }}
+    if: >-
+      !(github.event_name == 'issue_comment' &&
+        (github.event.comment.author_association == 'OWNER' ||
+         github.event.comment.author_association == 'MEMBER' ||
+         github.event.comment.author_association == 'COLLABORATOR'))
     concurrency:
       group: slack-notify-${{ github.event.issue.number }}
       cancel-in-progress: true
     steps:
-      - name: Truncate body
+      - name: Truncate fields
         id: truncate
         continue-on-error: true
         env:
@@ -40,13 +44,32 @@ jobs:
           TRUNCATED_TITLE=$(echo "$ISSUE_TITLE" | tr '\n' ' ' | tr -s ' ' | cut -d' ' -f1-10 || echo "")
           echo "title=${TRUNCATED_TITLE:-}" >> $GITHUB_OUTPUT
 
-      - name: Notify Slack
+      - name: Restore Slack thread TS
+        id: cache_restore
+        uses: actions/cache/restore@v4
+        with:
+          path: .slack-thread
+          key: slack-thread-${{ github.event.issue.number }}
+
+      - name: Read cached thread TS
+        id: thread
+        run: |
+          if [ -f .slack-thread/ts ]; then
+            echo "ts=$(cat .slack-thread/ts)" >> $GITHUB_OUTPUT
+          else
+            echo "ts=" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Post new Slack message
+        id: slack_new
+        if: steps.thread.outputs.ts == ''
         uses: slackapi/slack-github-action@v2.0.0
         with:
-          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
-          webhook-type: incoming-webhook
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          method: chat.postMessage
           payload: |
             {
+              "channel": "${{ secrets.SLACK_CHANNEL_ID }}",
               "text": "*GitHub Issue Update* on `${{ github.repository }}`",
               "attachments": [
                 {
@@ -81,3 +104,62 @@ jobs:
                 }
               ]
             }
+
+      - name: Reply to existing Slack thread
+        if: steps.thread.outputs.ts != ''
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          token: ${{ secrets.SLACK_BOT_TOKEN }}
+          method: chat.postMessage
+          payload: |
+            {
+              "channel": "${{ secrets.SLACK_CHANNEL_ID }}",
+              "thread_ts": "${{ steps.thread.outputs.ts }}",
+              "reply_broadcast": true,
+              "text": "*GitHub Issue Update* on `${{ github.repository }}`",
+              "attachments": [
+                {
+                  "color": "${{ github.event.action == 'closed' && '#d73a4a' || github.event.action == 'opened' && '#36a64f' || '#e8a404' }}",
+                  "fields": [
+                    {
+                      "title": "Action",
+                      "value": "${{ github.event_name == 'issue_comment' && 'New Comment' || github.event.action }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Triggered by",
+                      "value": ${{ toJSON(github.actor) }},
+                      "short": true
+                    },
+                    {
+                      "title": "Title",
+                      "value": ${{ toJSON(steps.truncate.outputs.title) }},
+                      "short": false
+                    },
+                    {
+                      "title": "Body",
+                      "value": ${{ toJSON(steps.truncate.outputs.body) }},
+                      "short": false
+                    },
+                    {
+                      "title": "Link",
+                      "value": "${{ github.event_name == 'issue_comment' && github.event.comment.html_url || github.event.issue.html_url }}",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
+
+      - name: Save thread TS to file
+        if: steps.thread.outputs.ts == '' && steps.slack_new.outcome == 'success'
+        run: |
+          mkdir -p .slack-thread
+          echo '${{ steps.slack_new.outputs.response }}' | jq -r '.ts' > .slack-thread/ts
+
+      - name: Cache thread TS
+        if: steps.thread.outputs.ts == '' && steps.slack_new.outcome == 'success'
+        uses: actions/cache/save@v4
+        with:
+          path: .slack-thread
+          key: slack-thread-${{ github.event.issue.number }}
