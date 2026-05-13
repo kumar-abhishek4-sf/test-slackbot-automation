@@ -23,6 +23,7 @@ jobs:
         env:
           COMMENT_BODY: ${{ github.event.comment.body }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
           if [ "$EVENT_NAME" = "issue_comment" ]; then
@@ -32,8 +33,7 @@ jobs:
           fi
           TRUNCATED=$(echo "$RAW" | tr '\n' ' ' | tr -s ' ' | cut -d' ' -f1-10 || echo "")
           echo "body=${TRUNCATED:-}" >> $GITHUB_OUTPUT
-          TITLE="${{ github.event.issue.title }}"
-          TRUNCATED_TITLE=$(echo "$TITLE" | tr '\n' ' ' | tr -s ' ' | cut -d' ' -f1-10 || echo "")
+          TRUNCATED_TITLE=$(echo "$ISSUE_TITLE" | tr '\n' ' ' | tr -s ' ' | cut -d' ' -f1-10 || echo "")
           echo "title=${TRUNCATED_TITLE:-}" >> $GITHUB_OUTPUT
 
       - name: Notify Slack
@@ -59,8 +59,8 @@ jobs:
                       "short": true
                     },
                     {
-                      "title": "Issue Title",
-                      "value": ${{ toJSON(github.event.issue.title) }},
+                      "title": "Title",
+                      "value": ${{ toJSON(steps.truncate.outputs.title) }},
                       "short": false
                     },
                     {
