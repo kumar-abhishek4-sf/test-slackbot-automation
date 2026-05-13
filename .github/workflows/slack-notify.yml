@@ -46,7 +46,7 @@ jobs:
                     },
                     {
                       "title": "Comment",
-                      "value": "${{ github.event_name == 'issue_comment' && toJSON(github.event.comment.body) || 'N/A' }}",
+                      "value": ${{ github.event_name == 'issue_comment' && toJSON(github.event.comment.body) || '"N/A"' }},
                       "short": false
                     },
                     {
