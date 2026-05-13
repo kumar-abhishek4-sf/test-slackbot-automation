@@ -52,17 +52,17 @@ jobs:
                     },
                     {
                       "title": "Triggered by",
-                      "value": "${{ github.actor }}",
+                      "value": ${{ toJSON(github.actor) }},
                       "short": true
                     },
                     {
                       "title": "Issue Title",
-                      "value": "${{ github.event.issue.title }}",
+                      "value": ${{ toJSON(github.event.issue.title) }},
                       "short": false
                     },
                     {
                       "title": "Body",
-                      "value": "${{ steps.truncate.outputs.body }}",
+                      "value": ${{ toJSON(steps.truncate.outputs.body) }},
                       "short": false
                     },
                     {
