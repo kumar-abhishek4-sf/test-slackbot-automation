@@ -1,0 +1,60 @@
+name: Slack Notifications
+
+on:
+  issues:
+    types:
+      - opened
+      - closed
+      - reopened
+
+  issue_comment:
+    types:
+      - created
+      - edited
+      - deleted
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify Slack
+        uses: slackapi/slack-github-action@v2.0.0
+        with:
+          webhook: ${{ secrets.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            {
+              "text": "*GitHub Issue Update* on `${{ github.repository }}`",
+              "attachments": [
+                {
+                  "color": "${{ github.event.action == 'closed' && '#d73a4a' || github.event.action == 'opened' && '#36a64f' || '#e8a404' }}",
+                  "fields": [
+                    {
+                      "title": "Action",
+                      "value": "${{ github.event_name == 'issue_comment' && 'New Comment' || github.event.action }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Triggered by",
+                      "value": "${{ github.actor }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Issue Title",
+                      "value": "${{ github.event.issue.title }}",
+                      "short": false
+                    },
+                    {
+                      "title": "Comment",
+                      "value": "${{ github.event_name == 'issue_comment' && toJSON(github.event.comment.body) || 'N/A' }}",
+                      "short": false
+                    },
+                    {
+                      "title": "Link",
+                      "value": "${{ github.event_name == 'issue_comment' && github.event.comment.html_url || github.event.issue.html_url }}",
+                      "short": false
+                    }
+                  ]
+                }
+              ]
+            }
