@@ -16,6 +16,7 @@ on:
 jobs:
   notify:
     runs-on: ubuntu-latest
+    if: ${{ !(github.event_name == 'issue_comment' && contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)) }}
     concurrency:
       group: slack-notify-${{ github.event.issue.number }}
       cancel-in-progress: true
