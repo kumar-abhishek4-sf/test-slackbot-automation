@@ -17,6 +17,22 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
+      - name: Truncate body
+        id: truncate
+        continue-on-error: true
+        env:
+          COMMENT_BODY: ${{ github.event.comment.body }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "issue_comment" ]; then
+            RAW="$COMMENT_BODY"
+          else
+            RAW="$ISSUE_BODY"
+          fi
+          TRUNCATED=$(echo "$RAW" | tr '\n' ' ' | tr -s ' ' | cut -d' ' -f1-10 || echo "")
+          echo "body=${TRUNCATED:-}" >> $GITHUB_OUTPUT
+
       - name: Notify Slack
         uses: slackapi/slack-github-action@v2.0.0
         with:
@@ -46,7 +62,7 @@ jobs:
                     },
                     {
                       "title": "Body",
-                      "value": ${{ github.event_name == 'issue_comment' && toJSON(github.event.comment.body) || toJSON(github.event.issue.body) }},
+                      "value": "${{ steps.truncate.outputs.body }}",
                       "short": false
                     },
                     {
